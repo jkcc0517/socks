@@ -32,8 +32,8 @@ pub struct SocksReply {
 }
 
 impl SocksReply {
-    pub fn new(rep: u8, ip_addr: SocketAddr) -> SocksReply {
-        let reply_message = match ip_addr.ip() {
+    pub fn new(rep: u8, socks_addr: SocketAddr) -> SocksReply {
+        let reply_message = match socks_addr.ip() {
             IpAddr::V4(ipv4) => {
                 SocksReply {
                     ver: 5,
@@ -41,7 +41,7 @@ impl SocksReply {
                     rsv: 0,
                     atyp: 1,
                     bnd_addr: DestinationAddress::IP(IpAddr::V4(Ipv4Addr::from(ipv4))),
-                    bnd_port: ip_addr.port(),
+                    bnd_port: socks_addr.port().to_be(),
                 }
             },
             IpAddr::V6(ipv6) => {
@@ -51,7 +51,7 @@ impl SocksReply {
                     rsv: 0,
                     atyp: 4,
                     bnd_addr: DestinationAddress::IP(IpAddr::V6(Ipv6Addr::from(ipv6))),
-                    bnd_port: ip_addr.port(),
+                    bnd_port: socks_addr.port().to_be(),
                 }
             },
         };

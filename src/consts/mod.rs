@@ -27,4 +27,4 @@ pub const SOCKS5_REPLY_ADDRESS_TYPE_NOT_SUPPORTED: u8 = 0x08;
 
 
 // 取得當前對外 Ipv4，另外加上當前 Ipv6 的 constent
-pub const BIND_IP_PORT: SocketAddr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 1080);
+// pub const BIND_IP_PORT: SocketAddr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 1080);

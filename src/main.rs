@@ -2,7 +2,7 @@ use log::{info, error, LevelFilter};
 use std::thread;
 use tokio::net::{TcpListener, TcpStream, ToSocketAddrs};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
-
+use std::net::SocketAddr;
 mod consts;
 mod socks;
 use crate::socks::{SocksHandler, SocksRequest, Socks5Command};
@@ -26,6 +26,7 @@ async fn socks_connection_handle(mut socket: TcpStream) -> Result<()> {
     let mut buf = [0; 1024];
     let mut first: bool = true;
     // In a loop, read data from the socket and write the data back.
+    
     loop {
         let n = socket.read(&mut buf).await.expect("Socket read error.") as u32;
         if n == 0 {
@@ -39,7 +40,14 @@ async fn socks_connection_handle(mut socket: TcpStream) -> Result<()> {
             let reply_message = MethodHandler::get_reply_message(&buf);
             socket.write(&reply_message).await.expect("reply for auth method request");
         } else {
-            let mut socks = SocksHandler::new(&mut socket, &buf.to_vec());
+            let server_ip_port: SocketAddr = socket.local_addr().unwrap().clone();
+            let client_ip_port: SocketAddr = socket.peer_addr().unwrap().clone();
+            let mut socks = SocksHandler::new(
+                &mut socket,
+                &buf.to_vec(),
+                server_ip_port,
+                client_ip_port,
+            );
             if let Err(e) = socks.execute_command().await {
                 error!("Socks error: {}", e);
                 return Ok(());

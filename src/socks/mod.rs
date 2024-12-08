@@ -2,17 +2,19 @@ pub mod replies;
 pub mod methods;
 pub mod client;
 pub mod utils;
+pub mod udp;
 
 use serde::ser::{Serialize, SerializeStruct, Serializer};
 // use serde::Serialize;
 use log::{debug, error, info};
-use tokio::net::{TcpListener, TcpStream, ToSocketAddrs};
-use std::net::SocketAddr;
+use std::net::{SocketAddr};
+use tokio::net::{TcpListener, TcpStream, ToSocketAddrs, UdpSocket, lookup_host};
+use tokio::sync::mpsc;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use std::sync::Arc;
+use udp::requests::UDPRequest;
 use crate::consts;
 use std::array::TryFromSliceError;
-// use log::{info, error};
-use tokio::net::lookup_host;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use replies::SocksReply;
 use anyhow::{Result, anyhow};
@@ -50,7 +52,7 @@ impl From<u8> for Socks5Command {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 // #[serde(untagged)]
 pub enum DestinationAddress {
     IP(IpAddr),
@@ -80,7 +82,37 @@ impl DestinationAddress {
             }
         }
     }
+    pub fn parse_destination_address(atyp: u8, data: &mut Vec<u8>) -> DestinationAddress {
+        match atyp {
+            consts::SOCKS5_ADDR_TYPE_IPV4 => {
+                let address: Vec<u8> = (1..=4).map(|_|
+                    data.remove(0)
+                ).collect();
+                let address: Result<[u8; 4], TryFromSliceError> = address.as_slice().try_into() as Result<[u8; 4], TryFromSliceError>;
+                DestinationAddress::IP(IpAddr::V4(Ipv4Addr::from(address.unwrap())))
+            },
+            consts::SOCKS5_ADDR_TYPE_DOMAIN_NAME => {
+                let number_of_name = data.remove(0);
+                let domain: String = (1..=number_of_name).map(|_|
+                    data.remove(0) as char
+                ).collect();
+                DestinationAddress::Domain(domain)
+            },
+            consts::SOCKS5_ADDR_TYPE_IPV6 => {
+                let address: Vec<u8> = (1..=16).map(|_|
+                    data.remove(0)
+                ).collect();
+                let address: Result<[u8; 16], TryFromSliceError> = address.as_slice().try_into() as Result<[u8; 16], TryFromSliceError>;
+                DestinationAddress::IP(IpAddr::V6(Ipv6Addr::from(address.unwrap())))
+            },
+            _ => {
+                debug!("{:?}", data);
+                panic!("atyp {:?} parsed error!!", atyp);
+            },
+        }
+    }
 }
+
 impl Serialize for DestinationAddress {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -104,7 +136,6 @@ impl Serialize for DestinationAddress {
             }
         };
         s
- 
     }
 }
 
@@ -140,32 +171,7 @@ impl SocksRequest {
         let _rsv: u8 = data.remove(0);
         let atyp: u8 = data.remove(0);
         //let destination_address: DestinationAddress = match atyp {
-        let dest_address: DestinationAddress = match atyp {
-            consts::SOCKS5_ADDR_TYPE_IPV4 => {
-                let address: Vec<u8> = (1..=4).map(|_|
-                    data.remove(0)
-                ).collect();
-                let address: Result<[u8; 4], TryFromSliceError> = address.as_slice().try_into() as Result<[u8; 4], TryFromSliceError>;
-                DestinationAddress::IP(IpAddr::V4(Ipv4Addr::from(address.unwrap())))
-            },
-            consts::SOCKS5_ADDR_TYPE_DOMAIN_NAME => {
-                let number_of_name = data.remove(0);
-                let domain: String = (1..=number_of_name).map(|_|
-                    data.remove(0) as char
-                ).collect();
-                DestinationAddress::Domain(domain)
-            },
-            consts::SOCKS5_ADDR_TYPE_IPV6 => {
-                let address: Vec<u8> = (1..=16).map(|_|
-                    data.remove(0)
-                ).collect();
-                let address: Result<[u8; 16], TryFromSliceError> = address.as_slice().try_into() as Result<[u8; 16], TryFromSliceError>;
-                DestinationAddress::IP(IpAddr::V6(Ipv6Addr::from(address.unwrap())))
-            },
-            _ => {
-                panic!("parse address error!!d");
-            },
-        };
+        let dest_address = DestinationAddress::parse_destination_address(atyp, &mut data);
         let port = calculate_port_number(data.remove(0), data.remove(0)).unwrap();
         let socks_request = SocksRequest {
             version: version,
@@ -194,21 +200,23 @@ impl SocksRequest {
 pub struct SocksHandler<T: AsyncRead + AsyncWrite + Unpin> {
     socket: T,
     socks_request: SocksRequest,
+    server_ip_port: SocketAddr,
+    client_ip_port: SocketAddr,
     // socks_reply: SocksReply,
 }
 
 impl<T: AsyncRead + AsyncWrite + Unpin> SocksHandler<T> {
-    pub fn new(socket: T, data: &Vec<u8>) -> SocksHandler<T> {
+    pub fn new(socket: T, data: &Vec<u8>, server_ip_port: SocketAddr, client_ip_port: SocketAddr) -> SocksHandler<T> {
         let data = data.clone();
         let socks_request = SocksRequest::deserialize_from_bytes(&data);
         SocksHandler {
             socket: socket,
             socks_request: socks_request,
+            server_ip_port: server_ip_port,
+            client_ip_port: client_ip_port,
         }
     }
-    pub fn generate_reply(&mut self, rep: u8) -> SocksReply {
-        SocksReply::new(rep, consts::BIND_IP_PORT)
-    }
+
     pub async fn execute_command(&mut self) -> Result<()> {
         debug!("execute command");
         let cmd = self.socks_request.get_command();
@@ -217,7 +225,8 @@ impl<T: AsyncRead + AsyncWrite + Unpin> SocksHandler<T> {
         }
         match cmd {
             Socks5Command::TCPBind => {
-                let resp = self.generate_reply(consts::SOCKS5_REPLY_COMMAND_NOT_SUPPORTED).serialize_to_bytes();
+                let resp = SocksReply::new(consts::SOCKS5_REPLY_COMMAND_NOT_SUPPORTED, self.server_ip_port).serialize_to_bytes();
+                // let resp = self.generate_reply(consts::SOCKS5_REPLY_COMMAND_NOT_SUPPORTED).serialize_to_bytes();
                 if let Err(e) = self.socket.write(&resp).await {
                     eprintln!("failed to write to socket; err = {:?}", e);
                 }
@@ -231,7 +240,8 @@ impl<T: AsyncRead + AsyncWrite + Unpin> SocksHandler<T> {
                 let outbound_socket = tcp_connect(socket_addr).await.unwrap();
                 // 判斷是否連線成功回傳正確的 res value
                 // log 輸出更多的資訊，來源 IP、DST、BND 等等
-                let reply_message = self.generate_reply(consts::SOCKS5_REPLY_SUCCEEDED).serialize_to_bytes();
+                let reply_message = SocksReply::new(consts::SOCKS5_REPLY_SUCCEEDED, self.server_ip_port).serialize_to_bytes();
+                // let reply_message = self.generate_reply(consts::SOCKS5_REPLY_SUCCEEDED).serialize_to_bytes();
                 if let Err(e) = self.socket.write(&reply_message).await {
                     eprintln!("failed to write to socket; err = {:?}", e);
                 }
@@ -248,11 +258,62 @@ impl<T: AsyncRead + AsyncWrite + Unpin> SocksHandler<T> {
                 Ok(())
             },
             Socks5Command::UDPAssociate => {
-                let resp = self.generate_reply(consts::SOCKS5_REPLY_COMMAND_NOT_SUPPORTED).serialize_to_bytes();
-                if let Err(e) = self.socket.write(&resp).await {
-                    eprintln!("failed to write to socket; err = {:?}", e);
+                // UDP socks request 會設定 type=domain domain=0 python client 是這樣實作的
+                // 看起來這個 bound socks proxy -> target 是後面才做的
+                // 感覺滿有問題好像可以不顧 TCP request 的 DST.addr 只要使用 UDP client 就可以決定送到哪裡
+                let listening_client_to_socks = UdpSocket::bind(format!("{}:0", self.server_ip_port.ip())).await?;
+                let listening_socks_to_target = UdpSocket::bind("0.0.0.0:0").await?;
+                debug!("UDP listener bound: {:?}", listening_client_to_socks);
+                debug!("UDP listener bound: {:?}", listening_socks_to_target);
+                let mut b = [0; 1024];
+                // debug!("{:?}", listening_client_to_socks.local_addr().unwrap());
+                let resp = SocksReply::new(consts::SOCKS5_REPLY_SUCCEEDED, listening_client_to_socks.local_addr().unwrap()).serialize_to_bytes();
+                // let lcts = Arc::new(listening_client_to_socks);
+                // let lcts2 = lcts.clone();
+                // let lstt = Arc::new(listening_socks_to_target);
+                // if let Err(e) = self.socket.write(&resp).await {
+                //     eprintln!("failed to write to socket; err = {:?}", e);
+                // }
+
+                // let (tx, mut rx) = mpsc::channel::<(Vec<u8>, SocketAddr)>(50);
+                // tokio::spawn(async move {
+                //     while let Some((bytes, addr)) = rx.recv().await {
+                //         let udp_request = UDPRequest::deserialize_from_bytes(&bytes);
+                //         let send_data = udp_request.get_udp_data();
+                //         let send_to_addr = udp_request.get_dst_socket_addr();
+                //         let _len_2 = lstt.send_to(&send_data, send_to_addr).await;
+                //         let len = lcts2.send_to(&bytes, &addr).await.unwrap();
+                //         let (len_3, _socket_addr) = lstt.recv_from(&mut b).await.unwrap();
+                //         let udp_response = &b[..len_3];
+                //         let reply_message = udp_request.reply(udp_response.to_vec());
+                //         lcts2.send_to(&reply_message, addr).await.unwrap();
+                //         println!("{:?} bytes sent", len);
+                //     }
+                // });
+                // let mut udp_buf = [0; 1024];
+                // loop {
+                //     let (len, addr) = lcts.recv_from(&mut udp_buf).await?;
+                //     println!("{:?} bytes received from {:?}", len, addr);
+                //     tx.send((udp_buf[..len].to_vec(), addr)).await.unwrap();
+                // }
+                println!("try read");
+
+                loop {
+                    info!("start udp listen {:?}", listening_client_to_socks);
+                    let (len, socks_listening_socks_to_target) = listening_client_to_socks.recv_from(&mut b).await?;
+                    debug!("length: {:?}", len);
+                    let udp_request = UDPRequest::deserialize_from_bytes(&b[..len]);
+                    debug!("{:?}", udp_request);
+                    let send_data = udp_request.get_udp_data();
+                    let send_to_addr = udp_request.get_dst_socket_addr();
+                    let _len_2 = listening_socks_to_target.send_to(&send_data, send_to_addr).await;
+                    let (len_3, _socket_addr) = listening_socks_to_target.recv_from(&mut b).await?;
+                    let udp_response = &b[..len_3];
+                    let reply_message = udp_request.reply(udp_response.to_vec());
+                    listening_client_to_socks.send_to(&reply_message, socks_listening_socks_to_target).await?;
                 }
-                Err(anyhow!("UDP associate not support"))
+                println!("udp finsh!");
+                Ok(())
             },
         }
     }
