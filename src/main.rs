@@ -1,4 +1,4 @@
-use log::{info, error, LevelFilter};
+use log::{debug, info, error, LevelFilter};
 use std::thread;
 use tokio::net::{TcpListener, TcpStream, ToSocketAddrs};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
@@ -28,13 +28,23 @@ async fn socks_connection_handle(mut socket: TcpStream) -> Result<()> {
     // In a loop, read data from the socket and write the data back.
     
     loop {
-        let n = socket.read(&mut buf).await.expect("Socket read error.") as u32;
-        if n == 0 {
-            info!("end the connection");
-            return Ok(())
-        }
+        let n = match socket.read(&mut buf).await {
+            Ok(n) => {
+                if n == 0 {
+                    info!("end the connection.");
+                    return Ok(())
+                }
+                n
+            },
+            Err(e) => {
+                debug!("socket connection error.");
+                return Ok(())
+            }
+        };
+
         let client_ip_info = socket.peer_addr();
         info!("{:?}", client_ip_info);
+        let buf = &buf[..n];
         if first == true {
             first = false;
             let reply_message = MethodHandler::get_reply_message(&buf);

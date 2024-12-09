@@ -3,7 +3,8 @@ pub mod methods;
 pub mod client;
 pub mod utils;
 pub mod udp;
-
+use tokio::time::{sleep, Duration};
+use std::thread;
 use serde::ser::{Serialize, SerializeStruct, Serializer};
 // use serde::Serialize;
 use log::{debug, error, info};
@@ -268,51 +269,78 @@ impl<T: AsyncRead + AsyncWrite + Unpin> SocksHandler<T> {
                 let mut b = [0; 1024];
                 // debug!("{:?}", listening_client_to_socks.local_addr().unwrap());
                 let resp = SocksReply::new(consts::SOCKS5_REPLY_SUCCEEDED, listening_client_to_socks.local_addr().unwrap()).serialize_to_bytes();
-                // let lcts = Arc::new(listening_client_to_socks);
-                // let lcts2 = lcts.clone();
-                // let lstt = Arc::new(listening_socks_to_target);
-                // if let Err(e) = self.socket.write(&resp).await {
-                //     eprintln!("failed to write to socket; err = {:?}", e);
-                // }
+                if let Err(e) = self.socket.write(&resp).await {
+                    eprintln!("failed to write to socket; err = {:?}", e);
+                }
+                let lcts = Arc::new(listening_client_to_socks);
+                let lcts2 = lcts.clone();
+                let lstt = Arc::new(listening_socks_to_target);
 
-                // let (tx, mut rx) = mpsc::channel::<(Vec<u8>, SocketAddr)>(50);
-                // tokio::spawn(async move {
-                //     while let Some((bytes, addr)) = rx.recv().await {
-                //         let udp_request = UDPRequest::deserialize_from_bytes(&bytes);
-                //         let send_data = udp_request.get_udp_data();
-                //         let send_to_addr = udp_request.get_dst_socket_addr();
-                //         let _len_2 = lstt.send_to(&send_data, send_to_addr).await;
-                //         let len = lcts2.send_to(&bytes, &addr).await.unwrap();
-                //         let (len_3, _socket_addr) = lstt.recv_from(&mut b).await.unwrap();
-                //         let udp_response = &b[..len_3];
-                //         let reply_message = udp_request.reply(udp_response.to_vec());
-                //         lcts2.send_to(&reply_message, addr).await.unwrap();
-                //         println!("{:?} bytes sent", len);
-                //     }
-                // });
-                // let mut udp_buf = [0; 1024];
-                // loop {
-                //     let (len, addr) = lcts.recv_from(&mut udp_buf).await?;
-                //     println!("{:?} bytes received from {:?}", len, addr);
-                //     tx.send((udp_buf[..len].to_vec(), addr)).await.unwrap();
-                // }
-                println!("try read");
+                let (tx, mut rx) = mpsc::channel::<(Vec<u8>, SocketAddr)>(50);
+                let rx_handler = tokio::spawn(async move {
+                    while let Some((bytes, addr)) = rx.recv().await {
+                        let udp_request = UDPRequest::deserialize_from_bytes(&bytes);
+                        let send_data = udp_request.get_udp_data();
+                        let send_to_addr = udp_request.get_dst_socket_addr();
+                        let _len_2 = lstt.send_to(&send_data, send_to_addr).await;
+                        let len = lcts2.send_to(&bytes, &addr).await.unwrap();
+                        let (len_3, _socket_addr) = lstt.recv_from(&mut b).await.unwrap();
+                        let udp_response = &b[..len_3];
+                        let reply_message = udp_request.reply(udp_response.to_vec());
+                        lcts2.send_to(&reply_message, addr).await.unwrap();
+                        println!("{:?} bytes sent", len);
+                    }
+                });
+                let mut udp_buf = [0; 1024];
+                let tx_handler = tokio::spawn(async move {
+                    loop {
+                        let (len, addr) = lcts.recv_from(&mut udp_buf).await.unwrap();
+                        debug!("{:?} bytes received from {:?}", len, addr);
+                        tx.send((udp_buf[..len].to_vec(), addr)).await.unwrap();
+                    }
+                });
 
                 loop {
-                    info!("start udp listen {:?}", listening_client_to_socks);
-                    let (len, socks_listening_socks_to_target) = listening_client_to_socks.recv_from(&mut b).await?;
-                    debug!("length: {:?}", len);
-                    let udp_request = UDPRequest::deserialize_from_bytes(&b[..len]);
-                    debug!("{:?}", udp_request);
-                    let send_data = udp_request.get_udp_data();
-                    let send_to_addr = udp_request.get_dst_socket_addr();
-                    let _len_2 = listening_socks_to_target.send_to(&send_data, send_to_addr).await;
-                    let (len_3, _socket_addr) = listening_socks_to_target.recv_from(&mut b).await?;
-                    let udp_response = &b[..len_3];
-                    let reply_message = udp_request.reply(udp_response.to_vec());
-                    listening_client_to_socks.send_to(&reply_message, socks_listening_socks_to_target).await?;
+                    sleep(Duration::from_secs(1)).await;
+                    match self.socket.write_all(b"ping").await {
+                        Ok(_) => {
+                            debug!("ping");
+                        },
+                        Err(_) => {
+                            debug!("Connection break");
+                            rx_handler.abort();
+                            tx_handler.abort();
+                            break;
+                        },
+                    }
                 }
-                println!("udp finsh!");
+
+                // loop {
+                //     match self.socket.write_all(b"ping").await {
+                //         Ok(_) => {
+                //             println!("connecting");
+                //         }, // 连接正常
+                //         Err(_) => {
+                //             println!("disconnect");
+                //             break;
+                //         }, // 连接已关闭
+                //     }
+                //     info!("start udp listen {:?}", listening_client_to_socks);
+                //     let (len, socks_listening_socks_to_target) = listening_client_to_socks.recv_from(&mut b).await?;
+                //     debug!("length: {:?}", len);
+                //     let udp_request = UDPRequest::deserialize_from_bytes(&b[..len]);
+                //     debug!("{:?}", udp_request);
+                //     let send_data = udp_request.get_udp_data();
+                //     let send_to_addr = udp_request.get_dst_socket_addr();
+                //     let _len_2 = listening_socks_to_target.send_to(&send_data, send_to_addr).await;
+                //     let (len_3, _socket_addr) = listening_socks_to_target.recv_from(&mut b).await?;
+                //     let udp_response = &b[..len_3];
+                //     let reply_message = udp_request.reply(udp_response.to_vec());
+                //     listening_client_to_socks.send_to(&reply_message, socks_listening_socks_to_target).await?;
+                //     sleep(Duration::from_secs(1)).await;
+                //     //thread::sleep(Duration::from_secs(1));
+                // }
+                debug!("udp finsh!");
                 Ok(())
             },
         }
