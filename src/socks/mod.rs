@@ -142,14 +142,10 @@ impl Serialize for DestinationAddress {
 
 fn calculate_port_number(first: u8, second: u8) -> Option<u16> {
     let o: Vec<u8> = vec![first, second];
-
     if o.len() == 2 {
         // 將 Vec<u8> 的前兩個元素組合成一個 16 位的整數
         let result: u16 = ((o[0] as u16) << 8) | (o[1] as u16);
-        println!("計算結果: {}", result);  // 輸出 258
         return Some(result);
-    } else {
-        println!("Vec 長度不正確");
     }
     None
 }
@@ -288,7 +284,6 @@ impl<T: AsyncRead + AsyncWrite + Unpin> SocksHandler<T> {
                         let udp_response = &b[..len_3];
                         let reply_message = udp_request.reply(udp_response.to_vec());
                         lcts2.send_to(&reply_message, addr).await.unwrap();
-                        println!("{:?} bytes sent", len);
                     }
                 });
                 let mut udp_buf = [0; 1024];
@@ -314,32 +309,6 @@ impl<T: AsyncRead + AsyncWrite + Unpin> SocksHandler<T> {
                         },
                     }
                 }
-
-                // loop {
-                //     match self.socket.write_all(b"ping").await {
-                //         Ok(_) => {
-                //             println!("connecting");
-                //         }, // 连接正常
-                //         Err(_) => {
-                //             println!("disconnect");
-                //             break;
-                //         }, // 连接已关闭
-                //     }
-                //     info!("start udp listen {:?}", listening_client_to_socks);
-                //     let (len, socks_listening_socks_to_target) = listening_client_to_socks.recv_from(&mut b).await?;
-                //     debug!("length: {:?}", len);
-                //     let udp_request = UDPRequest::deserialize_from_bytes(&b[..len]);
-                //     debug!("{:?}", udp_request);
-                //     let send_data = udp_request.get_udp_data();
-                //     let send_to_addr = udp_request.get_dst_socket_addr();
-                //     let _len_2 = listening_socks_to_target.send_to(&send_data, send_to_addr).await;
-                //     let (len_3, _socket_addr) = listening_socks_to_target.recv_from(&mut b).await?;
-                //     let udp_response = &b[..len_3];
-                //     let reply_message = udp_request.reply(udp_response.to_vec());
-                //     listening_client_to_socks.send_to(&reply_message, socks_listening_socks_to_target).await?;
-                //     sleep(Duration::from_secs(1)).await;
-                //     //thread::sleep(Duration::from_secs(1));
-                // }
                 debug!("udp finsh!");
                 Ok(())
             },

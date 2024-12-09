@@ -37,7 +37,7 @@ async fn socks_connection_handle(mut socket: TcpStream) -> Result<()> {
                 n
             },
             Err(e) => {
-                debug!("socket connection error.");
+                debug!("socket connection disconnect.");
                 return Ok(())
             }
         };
