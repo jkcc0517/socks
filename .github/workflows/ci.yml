@@ -24,6 +24,8 @@ jobs:
       - run: cargo test --verbose
       - name: Verify binary file exists
         run: ls -lh target/debug/socksproxy
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
