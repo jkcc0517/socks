@@ -11,9 +11,6 @@ env:
 jobs:
   build:
     name: Rust project - latest
-    permissions:
-      contents: write
-      packages: write
     strategy:
       matrix:
         toolchain:
