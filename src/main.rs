@@ -5,7 +5,7 @@ use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use std::net::SocketAddr;
 mod consts;
 mod socks;
-use crate::socks::{SocksHandler, SocksRequest, Socks5Command};
+use crate::socks::{SocksHandler, Socks5Command};
 use socks::methods::MethodHandler;
 use anyhow::{anyhow, Result};
 
