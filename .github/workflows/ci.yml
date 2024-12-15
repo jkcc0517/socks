@@ -60,7 +60,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           body: |
-            body contents
+            Release files
           files: |
             artifacts/ubuntu/socksproxy-x64
             artifacts/macos/socksproxy-macos
