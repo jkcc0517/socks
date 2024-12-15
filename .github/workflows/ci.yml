@@ -11,6 +11,8 @@ env:
 jobs:
   build:
     name: Rust project - latest
+    permissions:
+      contents: write
     strategy:
       matrix:
         toolchain:
@@ -47,14 +49,13 @@ jobs:
         with:
           name: ubuntu-latest-artifact
           path: artifacts/ubuntu
-
       - name: Download macOS artifact
         uses: actions/download-artifact@v3
         with:
           name: macos-latest-artifact
           path: artifacts/macos
       - name: Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v4
         with:
           prerelease: false
           body: |
