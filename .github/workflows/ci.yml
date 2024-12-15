@@ -31,6 +31,5 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Release
         uses: softprops/action-gh-release@v2
-        body: |
-          body contents
+        body: body contents
         files: target/debug/socksproxy
