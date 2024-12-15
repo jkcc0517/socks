@@ -29,20 +29,5 @@ jobs:
         run: ls -lh target/debug/socksproxy
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        with:
-          tag_name: my_tag
-
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Upload Release Binary
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_GITHUB_TOKENh: target/debug/socksproxy
-          asset_name: socksproxy
-          asset_content_type: application/octet-stream
+      - name: Release
+        uses: softprops/action-gh-release@v2
