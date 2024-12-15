@@ -18,9 +18,10 @@ jobs:
       matrix:
         toolchain:
           - stable
-        matrix:
-          platform: [ubuntu-latest, macos-latest]
-    runs-on: 	${{ matrix.platform }}
+        platform:
+          - ubuntu-latest
+          - macos-latest
+    runs-on:	${{ matrix.platform }}
 
     steps:
       - uses: actions/checkout@v4
