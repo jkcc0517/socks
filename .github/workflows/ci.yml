@@ -28,7 +28,7 @@ jobs:
       - name: Verify binary file exists
         run: ls -lh target/debug/socksproxy
         env:
-          GITHUB_TOKEN: ${{ secrets.TEST }}
+          GITHUB_TOKEN: ${{ secrets.PAT }}
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
@@ -36,11 +36,11 @@ jobs:
           tag_name: my_tag
 
         env:
-          GITHUB_TOKEN: ${{ secrets.TEST }}
+          GITHUB_TOKEN: ${{ secrets.PAT }}
       - name: Upload Release Binary
         uses: actions/upload-release-asset@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.TEST }}
+          GITHUB_TOKEN: ${{ secrets.PAT }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: target/debug/socksproxy
