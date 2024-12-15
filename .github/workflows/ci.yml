@@ -9,9 +9,9 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  release:
+  build:
     name: Rust project - latest
-    runs-on: 	macos-latest
+    runs-on: 	[ubuntu-latest, macos-latest]
     permissions:
       contents: write
       packages: write
@@ -19,19 +19,47 @@ jobs:
       matrix:
         toolchain:
           - stable
+      matrix:
+        platform: [ubuntu-latest, macos-latest]
 
     steps:
       - uses: actions/checkout@v4
       - run: rustup update ${{ matrix.toolchain }} && rustup default ${{ matrix.toolchain }}
-      - run: cargo build --verbose
+      - name: Build project
+        run: |
+          cargo build --release
+          mkdir -p dist
+          if [[ "${{ matrix.platform }}" == "ubuntu-latest" ]]; then
+            mv target/release/socksproxy dist/socksproxy-x64
+          else
+            mv target/release/socksproxy dist/socksproxy-macos
+          fi
       - run: cargo test --verbose
-      - name: Verify binary file exists
-        run: ls -lh target/debug/socksproxy
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.platform }}-artifact
+          path: dist/
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Ubuntu artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: ubuntu-latest-artifact
+          path: artifacts/ubuntu
+
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: macos-latest-artifact
+          path: artifacts/macos
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
           body: |
             body contents
-          files: target/debug/socksproxy
+          files: |
+            artifacts/ubuntu/socksproxy-x64
+            artifacts/macos/socksproxy-macos
