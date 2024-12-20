@@ -1,7 +1,7 @@
 use super::{SocksCommand, SocksAddress, SocksPort, calculate_port_number};
 use log::{debug, info};
 use std::net::IpAddr;
-use crate::socks::SocksMessage;
+use super::traits::*;
 
 #[derive(Debug)]
 #[allow(dead_code)]
@@ -13,7 +13,7 @@ pub struct SocksRequest {
     destination_port: SocksPort,
 }
 
-impl SocksMessage for SocksRequest {
+impl SocksSerializable for SocksRequest {
     fn deserialize_from_bytes(bytes: &[u8]) -> SocksRequest {
         debug!("socks request content: {:?}", bytes);
         let mut data = bytes.to_vec();

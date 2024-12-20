@@ -3,7 +3,7 @@ use crate::consts;
 use log::debug;
 use std::net::{Ipv4Addr, Ipv6Addr};
 use crate::socks::{SocksAddress, SocksPort};
-use crate::socks::SocksMessage;
+use super::traits::*;
 struct AuthReply {}
 
 /*
@@ -30,7 +30,7 @@ pub struct SocksReply {
     bnd_port: SocksPort,
 }
 
-impl SocksMessage for SocksReply {
+impl SocksSerializable for SocksReply {
     fn deserialize_from_bytes(bytes: &[u8]) -> Self {
         todo!()
     }

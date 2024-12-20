@@ -15,7 +15,6 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 use requests::SocksRequest;
 use anyhow::Result;
-use self::traits::SocksMessage;
 
 #[derive(Debug, Clone)]
 pub enum SocksCommand {

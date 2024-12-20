@@ -1,4 +1,6 @@
-pub trait SocksMessage {
+pub trait SocksSerializable {
     fn deserialize_from_bytes(bytes: &[u8]) -> Self;
-    fn serialize_to_bytes(&self) -> Vec<u8>;
+    fn serialize_to_bytes(&self) -> Vec<u8> {
+        vec![]
+    }
 }
