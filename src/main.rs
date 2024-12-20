@@ -4,8 +4,8 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use std::net::SocketAddr;
 mod consts;
 mod socks;
-use crate::socks::SocksHandler;
-use socks::handlers::MethodHandler;
+
+use socks::handlers::{SocksHandler, MethodHandler};
 use anyhow::Result;
 
 #[tokio::main]

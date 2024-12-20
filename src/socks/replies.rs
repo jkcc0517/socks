@@ -1,10 +1,8 @@
 use std::net::{IpAddr, SocketAddr};
 use crate::consts;
 use log::debug;
-use serde::{Serialize, Deserialize};
 use std::net::{Ipv4Addr, Ipv6Addr};
 use crate::socks::{SocksAddress, SocksPort};
-use bincode::{options, serialize};
 use crate::socks::SocksMessage;
 struct AuthReply {}
 

@@ -1,5 +1,3 @@
-use serde::{Serialize, Deserialize};
-use bincode;
 use log::{debug, info};
 
 #[derive(Debug)]
@@ -36,7 +34,7 @@ o  X'03' to X'7F' IANA ASSIGNED
 o  X'80' to X'FE' RESERVED FOR PRIVATE METHODS
 o  X'FF' NO ACCEPTABLE METHODS
  */
-#[derive(Serialize, Debug)]
+#[derive(Debug)]
 pub struct MethodReply {
     ver: u8,
     method: u8,
@@ -51,6 +49,6 @@ impl MethodReply {
     }
     pub fn serialize_to_bytes(&self) -> Vec<u8> {
         debug!("{:?}", self);
-        bincode::serialize(self).expect("Serialization failed")
+        vec![self.ver, self.method]
     }
 }

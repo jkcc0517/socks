@@ -1,9 +1,7 @@
-use crate::socks::SocksAddress;
-use crate::socks::calculate_port_number;
+use super::{SocksAddress, SocksPort};
+use super::calculate_port_number;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-use serde::Serialize;
 use log::{debug, info};
-use serde::ser::Serializer;
 
 // +----+------+------+----------+----------+----------+
 // |RSV | FRAG | ATYP | DST.ADDR | DST.PORT |   DATA   |
@@ -32,24 +30,14 @@ impl SocksUdpData {
         }
     }
 }
-impl Serialize for SocksUdpData {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        debug!("{:?}", self.data);
-        serializer.serialize_bytes(&self.data)
-        //serializer.serialize_bytes(&self.data)
-    }
-}
 
-#[derive(Debug, Serialize)]
+#[derive(Debug)]
 pub struct UdpMessage {
     rsv: u16,
     frag: u8,
     atyp: u8,
     dst_addr: SocksAddress,
-    dst_port: u16,
+    dst_port: SocksPort,
     data: SocksUdpData,
 }
 
@@ -67,22 +55,22 @@ impl UdpMessage {
             frag: frag,
             atyp: atyp,
             dst_addr: dst_address,
-            dst_port: port,
+            dst_port: SocksPort::new(port),
             data: SocksUdpData::new(udp_data.to_vec()),
         }
     }
     pub fn get_udp_data(&self) -> Vec<u8> {
         self.data.data.clone()
     }
-    pub fn _get_dst_addr(&self) -> Vec<u8> {
-        bincode::serialize(&self.dst_addr).unwrap()
-    }
+
     pub fn _get_dst_port(&self) -> u16 {
-        self.dst_port.to_be()
+        self.dst_port.into()
     }
+
     pub fn get_dst_socket_addr(&self) -> SocketAddr {
         SocketAddr::new(IpAddr::V4(Ipv4Addr::new(8, 8, 8, 8)), 53)
     }
+
     pub fn reply(&self, data: Vec<u8>) -> Vec<u8> {
         let mut message: Vec<u8> = vec![
             0,
@@ -90,8 +78,8 @@ impl UdpMessage {
             self.frag,
             self.atyp,
         ];
-        message.extend(bincode::serialize(&self.dst_addr).unwrap().to_vec());
-        message.extend(bincode::serialize(&self.dst_port).unwrap());
+        message.extend(&self.dst_addr.serialize_to_bytes());
+        message.extend(&self.dst_port.serialize_to_bytes());
         message.extend(&data);
         message
     }
