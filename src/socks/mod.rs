@@ -3,6 +3,9 @@ pub mod requests;
 pub mod methods;
 pub mod client;
 pub mod udp;
+pub mod traits;
+pub mod handlers;
+
 use tokio::time::{sleep, Duration};
 use serde::ser::{Serialize, Serializer};
 // use serde::Serialize;
@@ -13,17 +16,13 @@ use tokio::sync::mpsc;
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 use std::sync::Arc;
 use udp::UdpMessage;
-use crate::consts;
+use super::consts;
 use std::array::TryFromSliceError;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use replies::SocksReply;
 use requests::SocksRequest;
 use anyhow::{Result, anyhow};
-
-pub trait SocksMessage {
-    fn deserialize_from_bytes(bytes: &[u8]) -> Self;
-    fn serialize_to_bytes(&self) -> Vec<u8>;
-}
+use self::traits::SocksMessage;
 
 #[derive(Debug, Clone)]
 pub enum Socks5Command {

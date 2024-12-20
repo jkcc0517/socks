@@ -5,7 +5,7 @@ use std::net::SocketAddr;
 mod consts;
 mod socks;
 use crate::socks::SocksHandler;
-use socks::methods::MethodHandler;
+use socks::handlers::MethodHandler;
 use anyhow::Result;
 
 #[tokio::main]
