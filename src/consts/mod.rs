@@ -1,5 +1,4 @@
-use std::net::{SocketAddr, IpAddr, Ipv4Addr};
-
+#![allow(dead_code)]
 pub const SOCKS5_VERSION:                          u8 = 0x05;
 
 pub const SOCKS5_AUTH_METHOD_NONE:                 u8 = 0x00;
@@ -24,7 +23,3 @@ pub const SOCKS5_REPLY_CONNECTION_REFUSED:         u8 = 0x05;
 pub const SOCKS5_REPLY_TTL_EXPIRED:                u8 = 0x06;
 pub const SOCKS5_REPLY_COMMAND_NOT_SUPPORTED:      u8 = 0x07;
 pub const SOCKS5_REPLY_ADDRESS_TYPE_NOT_SUPPORTED: u8 = 0x08;
-
-
-// 取得當前對外 Ipv4，另外加上當前 Ipv6 的 constent
-// pub const BIND_IP_PORT: SocketAddr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 1080);

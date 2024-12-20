@@ -2,25 +2,28 @@ pub mod replies;
 pub mod requests;
 pub mod methods;
 pub mod client;
-pub mod utils;
 pub mod udp;
 use tokio::time::{sleep, Duration};
-use std::thread;
-use serde::ser::{Serialize, SerializeStruct, Serializer};
+use serde::ser::{Serialize, Serializer};
 // use serde::Serialize;
 use log::{debug, error, info};
-use std::net::{SocketAddr};
-use tokio::net::{TcpListener, TcpStream, ToSocketAddrs, UdpSocket, lookup_host};
+use std::net::SocketAddr;
+use tokio::net::{TcpStream, ToSocketAddrs, UdpSocket, lookup_host};
 use tokio::sync::mpsc;
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 use std::sync::Arc;
-use udp::requests::UDPRequest;
+use udp::UdpMessage;
 use crate::consts;
 use std::array::TryFromSliceError;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use replies::SocksReply;
 use requests::SocksRequest;
 use anyhow::{Result, anyhow};
+
+pub trait SocksMessage {
+    fn deserialize_from_bytes(bytes: &[u8]) -> Self;
+    fn serialize_to_bytes(&self) -> Vec<u8>;
+}
 
 #[derive(Debug, Clone)]
 pub enum Socks5Command {
@@ -55,20 +58,33 @@ impl From<u8> for Socks5Command {
     }
 }
 
+// 想要讓 u16 deserialize to bytes 的時候值是 Big Endian，並且在 display 的時候顯示正確的值
+#[derive(Debug)]
+struct SocksPort(u16);
+
+impl SocksPort {
+    pub fn new(port: u16) -> Self {
+        SocksPort(port)
+    }
+    pub fn serialize_to_bytes(&self) -> Vec<u8> {
+        self.0.to_be_bytes().to_vec()
+    }
+}
+
 #[derive(Debug, Clone)]
 // #[serde(untagged)]
-pub enum DestinationAddress {
+pub enum SocksAddress {
     IP(IpAddr),
     Domain(String),
 }
 
-impl DestinationAddress {
+impl SocksAddress {
     async fn get_ip_addr(&self) -> IpAddr {
         match self {
-            DestinationAddress::IP(ip_addr) => {
+            SocksAddress::IP(ip_addr) => {
                 *ip_addr
             },
-            DestinationAddress::Domain(domain) => {
+            SocksAddress::Domain(domain) => {
                 let mut ip_addr: Option<IpAddr> = None;
                 let address = format!("{}:666", domain);
                 for addr in lookup_host(address).await.unwrap() {
@@ -85,28 +101,28 @@ impl DestinationAddress {
             }
         }
     }
-    pub fn parse_destination_address(atyp: u8, data: &mut Vec<u8>) -> DestinationAddress {
+    pub fn parse_destination_address(atyp: u8, data: &mut Vec<u8>) -> SocksAddress {
         match atyp {
             consts::SOCKS5_ADDR_TYPE_IPV4 => {
                 let address: Vec<u8> = (1..=4).map(|_|
                     data.remove(0)
                 ).collect();
                 let address: Result<[u8; 4], TryFromSliceError> = address.as_slice().try_into() as Result<[u8; 4], TryFromSliceError>;
-                DestinationAddress::IP(IpAddr::V4(Ipv4Addr::from(address.unwrap())))
+                SocksAddress::IP(IpAddr::V4(Ipv4Addr::from(address.unwrap())))
             },
             consts::SOCKS5_ADDR_TYPE_DOMAIN_NAME => {
                 let number_of_name = data.remove(0);
                 let domain: String = (1..=number_of_name).map(|_|
                     data.remove(0) as char
                 ).collect();
-                DestinationAddress::Domain(domain)
+                SocksAddress::Domain(domain)
             },
             consts::SOCKS5_ADDR_TYPE_IPV6 => {
                 let address: Vec<u8> = (1..=16).map(|_|
                     data.remove(0)
                 ).collect();
                 let address: Result<[u8; 16], TryFromSliceError> = address.as_slice().try_into() as Result<[u8; 16], TryFromSliceError>;
-                DestinationAddress::IP(IpAddr::V6(Ipv6Addr::from(address.unwrap())))
+                SocksAddress::IP(IpAddr::V6(Ipv6Addr::from(address.unwrap())))
             },
             _ => {
                 debug!("{:?}", data);
@@ -114,15 +130,33 @@ impl DestinationAddress {
             },
         }
     }
+    pub fn serialize_to_bytes(&self) -> Vec<u8> {
+        let s: Vec<u8> = match self {
+            SocksAddress::IP(ip) => {
+                match ip {
+                    IpAddr::V4(ipv4) => {
+                        ipv4.octets().to_vec()
+                    },
+                    IpAddr::V6(ipv6) => {
+                        ipv6.octets().to_vec()
+                    },
+                }
+            },
+            SocksAddress::Domain(domain) => {
+                todo!();
+            }
+        };
+        s
+    }
 }
 
-impl Serialize for DestinationAddress {
+impl Serialize for SocksAddress {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
         let s = match self {
-            DestinationAddress::IP(ip) => {
+            SocksAddress::IP(ip) => {
                 match ip {
                     IpAddr::V4(ipv4) => {
                         let u32_ip: u32 = u32::from_le_bytes(ipv4.octets());
@@ -134,7 +168,7 @@ impl Serialize for DestinationAddress {
                     },
                 }
             },
-            DestinationAddress::Domain(domain) => {
+            SocksAddress::Domain(domain) => {
                 serializer.serialize_bytes(domain.as_bytes())
             }
         };
@@ -183,7 +217,7 @@ impl<T: AsyncRead + AsyncWrite + Unpin> SocksHandler<T> {
                 let resp = SocksReply::new(consts::SOCKS5_REPLY_COMMAND_NOT_SUPPORTED, self.server_ip_port).serialize_to_bytes();
                 // let resp = self.generate_reply(consts::SOCKS5_REPLY_COMMAND_NOT_SUPPORTED).serialize_to_bytes();
                 if let Err(e) = self.socket.write(&resp).await {
-                    eprintln!("failed to write to socket; err = {:?}", e);
+                    error!("failed to write to socket; err = {:?}", e);
                 }
                 Err(anyhow!("TCP Bind command not support"))
             },
@@ -233,11 +267,11 @@ impl<T: AsyncRead + AsyncWrite + Unpin> SocksHandler<T> {
                 let (tx, mut rx) = mpsc::channel::<(Vec<u8>, SocketAddr)>(50);
                 let rx_handler = tokio::spawn(async move {
                     while let Some((bytes, addr)) = rx.recv().await {
-                        let udp_request = UDPRequest::deserialize_from_bytes(&bytes);
+                        let udp_request = UdpMessage::deserialize_from_bytes(&bytes);
                         let send_data = udp_request.get_udp_data();
                         let send_to_addr = udp_request.get_dst_socket_addr();
                         let _len_2 = lstt.send_to(&send_data, send_to_addr).await;
-                        let len = lcts2.send_to(&bytes, &addr).await.unwrap();
+                        let _len = lcts2.send_to(&bytes, &addr).await.unwrap();
                         let (len_3, _socket_addr) = lstt.recv_from(&mut b).await.unwrap();
                         let udp_response = &b[..len_3];
                         let reply_message = udp_request.reply(udp_response.to_vec());

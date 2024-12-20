@@ -3,6 +3,7 @@ use bincode;
 use log::{debug, info};
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct MethodRequest {
     ver: u8,
     n_methods: u8,
@@ -64,10 +65,7 @@ impl MethodHandler {
             true => crate::consts::SOCKS5_AUTH_METHOD_NONE,
             false => crate::consts::SOCKS5_AUTH_METHOD_NOT_ACCEPTABLE,
         };
-        let m_reply = MethodReply {
-            ver: 5,
-            method: allow_method,
-        };
+        let m_reply = MethodReply::new(allow_method);
         m_reply.serialize_to_bytes()
     }
 }

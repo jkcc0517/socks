@@ -1,13 +1,12 @@
-use log::{debug, info, error, LevelFilter};
-use std::thread;
-use tokio::net::{TcpListener, TcpStream, ToSocketAddrs};
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use log::{debug, info, error};
+use tokio::net::{TcpListener, TcpStream};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use std::net::SocketAddr;
 mod consts;
 mod socks;
-use crate::socks::{SocksHandler, Socks5Command};
+use crate::socks::SocksHandler;
 use socks::methods::MethodHandler;
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -24,9 +23,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 async fn socks_connection_handle(mut socket: TcpStream) -> Result<()> {
     let mut buf = [0; 1024];
-    let mut first: bool = true;
+    let mut is_authenticated: bool = false;
     // In a loop, read data from the socket and write the data back.
-    
+
     loop {
         let n = match socket.read(&mut buf).await {
             Ok(n) => {
@@ -37,7 +36,7 @@ async fn socks_connection_handle(mut socket: TcpStream) -> Result<()> {
                 n
             },
             Err(e) => {
-                debug!("socket connection disconnect.");
+                debug!("socket connection disconnect.\n{}", e);
                 return Ok(())
             }
         };
@@ -45,8 +44,8 @@ async fn socks_connection_handle(mut socket: TcpStream) -> Result<()> {
         let client_ip_info = socket.peer_addr();
         info!("{:?}", client_ip_info);
         let buf = &buf[..n];
-        if first == true {
-            first = false;
+        if is_authenticated == false {
+            is_authenticated = true;
             let reply_message = MethodHandler::get_reply_message(&buf);
             socket.write(&reply_message).await.expect("reply for auth method request");
         } else {
