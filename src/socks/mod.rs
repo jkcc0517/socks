@@ -25,31 +25,31 @@ use anyhow::{Result, anyhow};
 use self::traits::SocksMessage;
 
 #[derive(Debug, Clone)]
-pub enum Socks5Command {
+pub enum SocksCommand {
     TCPConnect,
     TCPBind,
     UDPAssociate,
 }
 
 #[allow(dead_code)]
-impl Socks5Command {
+impl SocksCommand {
     #[inline]
     #[rustfmt::skip]
     fn as_u8(&self) -> u8 {
         match self {
-            Socks5Command::TCPConnect   => consts::SOCKS5_CMD_TCP_CONNECT,
-            Socks5Command::TCPBind      => consts::SOCKS5_CMD_TCP_BIND,
-            Socks5Command::UDPAssociate => consts::SOCKS5_CMD_UDP_ASSOCIATE,
+            SocksCommand::TCPConnect   => consts::SOCKS5_CMD_TCP_CONNECT,
+            SocksCommand::TCPBind      => consts::SOCKS5_CMD_TCP_BIND,
+            SocksCommand::UDPAssociate => consts::SOCKS5_CMD_UDP_ASSOCIATE,
         }
     }
 }
 
-impl From<u8> for Socks5Command {
-    fn from(number: u8) -> Socks5Command {
+impl From<u8> for SocksCommand {
+    fn from(number: u8) -> SocksCommand {
         match number {
-            consts::SOCKS5_CMD_TCP_CONNECT      => Socks5Command::TCPConnect,
-            consts::SOCKS5_CMD_TCP_BIND         => Socks5Command::TCPBind,
-            consts::SOCKS5_CMD_UDP_ASSOCIATE    => Socks5Command::UDPAssociate,
+            consts::SOCKS5_CMD_TCP_CONNECT      => SocksCommand::TCPConnect,
+            consts::SOCKS5_CMD_TCP_BIND         => SocksCommand::TCPBind,
+            consts::SOCKS5_CMD_UDP_ASSOCIATE    => SocksCommand::UDPAssociate,
             _ => {
                 panic!("run socks5 command");
             },
@@ -216,7 +216,7 @@ impl<T: AsyncRead + AsyncWrite + Unpin> SocksHandler<T> {
             panic!("wrong socks version!");
         }
         match cmd {
-            Socks5Command::TCPBind => {
+            SocksCommand::TCPBind => {
                 let resp = SocksReply::new(consts::SOCKS5_REPLY_COMMAND_NOT_SUPPORTED, self.server_ip_port).serialize_to_bytes();
                 // let resp = self.generate_reply(consts::SOCKS5_REPLY_COMMAND_NOT_SUPPORTED).serialize_to_bytes();
                 if let Err(e) = self.socket.write(&resp).await {
@@ -224,7 +224,7 @@ impl<T: AsyncRead + AsyncWrite + Unpin> SocksHandler<T> {
                 }
                 Err(anyhow!("TCP Bind command not support"))
             },
-            Socks5Command::TCPConnect => {
+            SocksCommand::TCPConnect => {
                 let socket_addr = SocketAddr::new(
                     self.socks_request.get_dst_addr().await,
                     self.socks_request.get_dst_port()
@@ -249,7 +249,7 @@ impl<T: AsyncRead + AsyncWrite + Unpin> SocksHandler<T> {
                 transfer(&mut self.socket, outbound_socket).await.unwrap();
                 Ok(())
             },
-            Socks5Command::UDPAssociate => {
+            SocksCommand::UDPAssociate => {
                 // UDP socks request 會設定 type=domain domain=0 python client 是這樣實作的
                 // 看起來這個 bound socks proxy -> target 是後面才做的
                 // 感覺滿有問題好像可以不顧 TCP request 的 DST.addr 只要使用 UDP client 就可以決定送到哪裡

@@ -1,4 +1,4 @@
-use crate::socks::{Socks5Command, SocksAddress, SocksPort, calculate_port_number};
+use super::{SocksCommand, SocksAddress, SocksPort, calculate_port_number};
 use log::{debug, info};
 use std::net::IpAddr;
 use crate::socks::SocksMessage;
@@ -7,7 +7,7 @@ use crate::socks::SocksMessage;
 #[allow(dead_code)]
 pub struct SocksRequest {
     version: u8,
-    command: Socks5Command,
+    command: SocksCommand,
     atyp: u8,
     destination_address: SocksAddress,
     destination_port: SocksPort,
@@ -18,7 +18,7 @@ impl SocksMessage for SocksRequest {
         debug!("socks request content: {:?}", bytes);
         let mut data = bytes.to_vec();
         let version = data.remove(0);
-        let command = Socks5Command::from(data.remove(0));
+        let command = SocksCommand::from(data.remove(0));
         let _rsv: u8 = data.remove(0);
         let atyp: u8 = data.remove(0);
         //let destination_address: SocksAddress = match atyp {
@@ -47,7 +47,7 @@ impl SocksRequest {
     pub fn get_dst_port(&self) -> u16 {
         self.destination_port.into()
     }
-    pub fn get_command(&self) -> Socks5Command {
+    pub fn get_command(&self) -> SocksCommand {
         self.command.clone()
     }
     pub fn get_version(&self) -> u8 {
