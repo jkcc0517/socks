@@ -59,7 +59,7 @@ impl From<u8> for Socks5Command {
 }
 
 // 想要讓 u16 deserialize to bytes 的時候值是 Big Endian，並且在 display 的時候顯示正確的值
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 struct SocksPort(u16);
 
 impl SocksPort {
@@ -70,7 +70,11 @@ impl SocksPort {
         self.0.to_be_bytes().to_vec()
     }
 }
-
+impl From<SocksPort> for u16 {
+    fn from(val: SocksPort) -> Self {
+        val.0
+    }
+}
 #[derive(Debug, Clone)]
 // #[serde(untagged)]
 pub enum SocksAddress {
