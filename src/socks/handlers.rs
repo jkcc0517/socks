@@ -50,8 +50,8 @@ impl<T: AsyncRead + AsyncWrite + Unpin> SocksHandler<T> {
 
     pub async fn execute_command(&mut self) -> Result<()> {
         debug!("execute command");
-        let cmd = self.socks_request.get_command();
-        if self.socks_request.get_version() != 5 {
+        let cmd = self.socks_request.get_cmd();
+        if self.socks_request.get_ver() != 5 {
             panic!("wrong socks version!");
         }
         match cmd {

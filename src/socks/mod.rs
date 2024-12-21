@@ -100,7 +100,7 @@ impl SocksAddress {
             }
         }
     }
-    pub fn parse_destination_address(atyp: u8, data: &mut Vec<u8>) -> SocksAddress {
+    pub fn parse_dst_address(atyp: u8, data: &mut Vec<u8>) -> SocksAddress {
         match atyp {
             consts::SOCKS5_ADDR_TYPE_IPV4 => {
                 let address: Vec<u8> = (1..=4).map(|_|

@@ -62,7 +62,7 @@ impl SocksDeserializeable for UdpMessage {
         let _rsv: Vec<u8> = data.drain(0..2).collect(); // 保留位元組，不處理
         let frag: u8 = data.remove(0);
         let atyp: u8 = data.remove(0);
-        let dst_address = SocksAddress::parse_destination_address(atyp, &mut data);
+        let dst_address = SocksAddress::parse_dst_address(atyp, &mut data);
         let port = calculate_port_number(data.remove(0), data.remove(0)).unwrap();
         let udp_data: &[u8] = &data[0..];
         Self {
