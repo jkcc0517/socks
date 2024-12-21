@@ -8,7 +8,7 @@ mod socks;
 use socks::handlers::{SocksHandler, MethodHandler};
 use anyhow::Result;
 
-#[tokio::main]
+#[tokio::main(flavor = "multi_thread", worker_threads = 100)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
 

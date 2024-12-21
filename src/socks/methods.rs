@@ -1,4 +1,5 @@
 use log::{debug, info};
+use super::traits::*;
 
 #[derive(Debug)]
 #[allow(dead_code)]
@@ -8,9 +9,8 @@ pub struct MethodRequest {
     methods: Vec<u8>,
 }
 
-// TODO for impl trait
-impl MethodRequest {
-    pub fn deserialize_from_bytes(bytes: &[u8]) -> MethodRequest {
+impl SocksDeserializeable for MethodRequest {
+    fn deserialize_from_bytes(bytes: &[u8]) -> MethodRequest {
         let n_methods = bytes[1];
         let end: usize = n_methods as usize + 2;
         MethodRequest {
@@ -19,6 +19,10 @@ impl MethodRequest {
             methods: bytes[2..end].to_vec(),
         }
     }
+}
+
+// TODO for impl trait
+impl MethodRequest {
     pub fn method_exists(&self, method: u8) -> bool {
         if self.methods.contains(&method) {
             true
@@ -48,7 +52,10 @@ impl MethodReply {
             method,
         }
     }
-    pub fn serialize_to_bytes(&self) -> Vec<u8> {
+}
+
+impl SocksSerializable for MethodReply {
+    fn serialize_to_bytes(&self) -> Vec<u8> {
         debug!("{:?}", self);
         vec![self.ver, self.method]
     }
