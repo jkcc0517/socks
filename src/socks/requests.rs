@@ -13,7 +13,7 @@ pub struct SocksRequest {
     destination_port: SocksPort,
 }
 
-impl SocksSerializable for SocksRequest {
+impl SocksDeserializeable for SocksRequest {
     fn deserialize_from_bytes(bytes: &[u8]) -> SocksRequest {
         debug!("socks request content: {:?}", bytes);
         let mut data = bytes.to_vec();
@@ -34,7 +34,9 @@ impl SocksSerializable for SocksRequest {
         debug!("{:?}", socks_request);
         socks_request
     }
+}
 
+impl SocksSerializable for SocksRequest {
     fn serialize_to_bytes(&self) -> Vec<u8> {
         todo!()
     }

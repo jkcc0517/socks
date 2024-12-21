@@ -9,6 +9,7 @@ pub mod handlers;
 // use serde::Serialize;
 use log::{debug, error, info};
 use tokio::net::lookup_host;
+use traits::*;
 use super::consts;
 use std::array::TryFromSliceError;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
@@ -57,7 +58,10 @@ impl SocksPort {
     pub fn new(port: u16) -> Self {
         SocksPort(port)
     }
-    pub fn serialize_to_bytes(&self) -> Vec<u8> {
+
+}
+impl SocksSerializable for SocksPort {
+    fn serialize_to_bytes(&self) -> Vec<u8> {
         self.0.to_be_bytes().to_vec()
     }
 }

@@ -116,8 +116,8 @@ impl<T: AsyncRead + AsyncWrite + Unpin> SocksHandler<T> {
                         let _len = lcts2.send_to(&bytes, &addr).await.unwrap();
                         let (len_3, _socket_addr) = lstt.recv_from(&mut b).await.unwrap();
                         let udp_response = &b[..len_3];
-                        let reply_message = udp_request.reply(udp_response.to_vec());
-                        lcts2.send_to(&reply_message, addr).await.unwrap();
+                        let reply_message = udp_request.generate_reply_message(udp_response.to_vec());
+                        lcts2.send_to(&reply_message.serialize_to_bytes(), addr).await.unwrap();
                     }
                 });
                 let mut udp_buf = [0; 1024];

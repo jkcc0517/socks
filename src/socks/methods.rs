@@ -8,6 +8,7 @@ pub struct MethodRequest {
     methods: Vec<u8>,
 }
 
+// TODO for impl trait
 impl MethodRequest {
     pub fn deserialize_from_bytes(bytes: &[u8]) -> MethodRequest {
         let n_methods = bytes[1];
