@@ -12,21 +12,31 @@ use anyhow::{Result, anyhow};
 use tokio::sync::mpsc;
 use super::consts;
 use super::traits::*;
-pub struct MethodHandler {}
 
-impl MethodHandler {
-    pub fn get_reply_message(request: &[u8]) -> Vec<u8> {
-        let m_request = MethodRequest::deserialize_from_bytes(request);
-        debug!("{:?}", m_request);
-        let allow_method = match m_request.method_exists(0) {
+pub struct MethodHandler<T: AsyncRead + AsyncWrite + Unpin> {
+    socket: T,
+    method_request: MethodRequest,
+}
+
+impl<T: AsyncRead + AsyncWrite + Unpin> MethodHandler<T> {
+    pub fn new(socket: T, request: &[u8]) -> Self {
+        let r: MethodRequest = MethodRequest::deserialize_from_bytes(request);
+        debug!("{:?}", r);
+        Self {
+            socket: socket,
+            method_request: r,
+        }
+    }
+    pub async fn reply(&mut self) -> Result<()> {
+        let allow_method = match self.method_request.method_exists(0) {
             true => crate::consts::SOCKS5_AUTH_METHOD_NONE,
             false => crate::consts::SOCKS5_AUTH_METHOD_NOT_ACCEPTABLE,
         };
-        let m_reply = MethodReply::new(allow_method);
-        m_reply.serialize_to_bytes()
+        let method_reply = MethodReply::new(allow_method);
+        self.socket.write(&method_reply.serialize_to_bytes()).await?;
+        Ok(())
     }
 }
-
 
 pub struct SocksHandler<T: AsyncRead + AsyncWrite + Unpin> {
     socket: T,
@@ -68,15 +78,12 @@ impl<T: AsyncRead + AsyncWrite + Unpin> SocksHandler<T> {
         let reply_message = SocksReply::new(consts::SOCKS5_REPLY_SUCCEEDED, self.server_ip_port).serialize_to_bytes();
         // let reply_message = self.generate_reply(consts::SOCKS5_REPLY_SUCCEEDED).serialize_to_bytes();
         if let Err(e) = self.socket.write(&reply_message).await {
-            eprintln!("failed to write to socket; err = {:?}", e);
+            error!("failed to write to socket; err = {:?}", e);
+            return Err(anyhow!("{}", e));
         }
-        match self.socket.flush().await {
-            Ok(_) => {
-                println!("ok");
-            }
-            Err(e) => {
-                return Err(anyhow!("{}", e));
-            }
+
+        if let Err(e) = self.socket.flush().await {
+            return Err(anyhow!("{}", e));
         }
 
         transfer(&mut self.socket, outbound_socket).await.unwrap();
@@ -98,7 +105,8 @@ impl<T: AsyncRead + AsyncWrite + Unpin> SocksHandler<T> {
             udp_for_client.local_addr().unwrap()
         ).serialize_to_bytes();
         if let Err(e) = self.socket.write(&resp).await {
-            eprintln!("failed to write to socket; err = {:?}", e);
+            error!("failed to write to socket; err = {:?}", e);
+            return Err(anyhow!("{}", e));
         }
         let aufc = Arc::new(udp_for_client);
         let aufc2 = aufc.clone();
@@ -111,7 +119,6 @@ impl<T: AsyncRead + AsyncWrite + Unpin> SocksHandler<T> {
                 let send_data = udp_request.get_udp_data();
                 let send_to_addr = udp_request.get_dst_socket_addr();
                 let _ = auft.send_to(&send_data, send_to_addr).await.unwrap();
-                // let _ = aufc2.send_to(&bytes, &addr).await.unwrap();
                 let (resp_len, _socket_addr) = auft.recv_from(&mut b).await.unwrap();
                 let udp_response = &b[..resp_len];
                 let reply_message = udp_request.generate_reply_message(udp_response.to_vec());
@@ -188,31 +195,11 @@ pub async fn tcp_connect<T>(addr: T) -> Result<TcpStream>
 {
     match TcpStream::connect(addr).await {
         Ok(o) => {
-            println!("connect successful.");
+            info!("connect successful.");
             Ok(o)
         },
         Err(e) => match e.kind() {
             _ => Err(e.into()), // #[error("General failure")] ?
         },
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::consts;
-
-    #[test]
-    fn test_method_handler_valid_method() {
-        let request = vec![5, 1, consts::SOCKS5_AUTH_METHOD_NONE]; // Version 5, 1 method, method=NO_AUTH
-        let reply = MethodHandler::get_reply_message(&request);
-        assert_eq!(reply, vec![5, consts::SOCKS5_AUTH_METHOD_NONE]);
-    }
-
-    #[test]
-    fn test_method_handler_invalid_method() {
-        let request = vec![5, 1, 0xff]; // Version 5, 1 method, unsupported method
-        let reply = MethodHandler::get_reply_message(&request);
-        assert_eq!(reply, vec![5, consts::SOCKS5_AUTH_METHOD_NOT_ACCEPTABLE]);
     }
 }

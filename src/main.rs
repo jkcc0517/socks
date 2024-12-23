@@ -16,12 +16,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     loop {
         let (socket, _) = listener.accept().await?;
         tokio::spawn(async move {
-            socks_connection_handle(socket).await.unwrap();
+            process_socks_connection(socket).await.unwrap();
         });
     }
 }
 
-async fn socks_connection_handle(mut socket: TcpStream) -> Result<()> {
+async fn process_socks_connection(mut socket: TcpStream) -> Result<()> {
     let mut buf = [0; 1024];
     let mut is_authenticated: bool = false;
     // In a loop, read data from the socket and write the data back.
@@ -36,7 +36,7 @@ async fn socks_connection_handle(mut socket: TcpStream) -> Result<()> {
                 n
             },
             Err(e) => {
-                debug!("socket connection disconnect.\n{}", e);
+                debug!("socket connection disconnect. Reason: {}", e);
                 return Ok(())
             }
         };
@@ -45,19 +45,19 @@ async fn socks_connection_handle(mut socket: TcpStream) -> Result<()> {
         info!("{:?}", client_ip_info);
         let buf = &buf[..n];
         if is_authenticated == false {
+            let mut method_handler = MethodHandler::new(&mut socket, &buf);
+            method_handler.reply().await?;
             is_authenticated = true;
-            let reply_message = MethodHandler::get_reply_message(&buf);
-            socket.write(&reply_message).await.expect("reply for auth method request");
         } else {
             let server_ip_port: SocketAddr = socket.local_addr().unwrap().clone();
             let client_ip_port: SocketAddr = socket.peer_addr().unwrap().clone();
-            let mut socks = SocksHandler::new(
+            let mut socks_handler = SocksHandler::new(
                 &mut socket,
                 &buf.to_vec(),
                 server_ip_port,
                 client_ip_port,
             );
-            if let Err(e) = socks.execute_command().await {
+            if let Err(e) = socks_handler.execute_command().await {
                 error!("Socks error: {}", e);
                 return Ok(());
             }
