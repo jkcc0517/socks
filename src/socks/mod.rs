@@ -7,13 +7,12 @@ pub mod traits;
 pub mod handlers;
 
 // use serde::Serialize;
-use log::{debug, error, info};
+use log::debug;
 use tokio::net::lookup_host;
 use traits::*;
 use super::consts;
 use std::array::TryFromSliceError;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
-
 use requests::SocksRequest;
 use anyhow::Result;
 

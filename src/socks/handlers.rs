@@ -1,17 +1,17 @@
 use super::methods::{MethodRequest, MethodReply};
 use super::{SocksCommand, SocksRequest};
-use std::net::SocketAddr;
-use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
-use std::sync::Arc;
 use super::udp::UdpMessage;
-use log::{debug, error, info};
-use tokio::time::{sleep, Duration};
-use tokio::net::{TcpStream, ToSocketAddrs, UdpSocket};
 use super::replies::SocksReply;
-use anyhow::{Result, anyhow};
-use tokio::sync::mpsc;
 use super::consts;
 use super::traits::*;
+use std::net::SocketAddr;
+use std::sync::Arc;
+use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
+use tokio::time::{sleep, Duration};
+use tokio::net::{TcpStream, ToSocketAddrs, UdpSocket};
+use tokio::sync::mpsc;
+use log::{debug, error, info};
+use anyhow::{Result, anyhow};
 
 pub struct MethodHandler<T: AsyncRead + AsyncWrite + Unpin> {
     socket: T,

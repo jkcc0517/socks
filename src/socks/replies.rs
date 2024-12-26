@@ -1,9 +1,9 @@
-use std::net::{IpAddr, SocketAddr};
-use crate::consts;
+use std::net::{IpAddr, SocketAddr, Ipv4Addr, Ipv6Addr};
+use super::consts;
 use log::debug;
-use std::net::{Ipv4Addr, Ipv6Addr};
-use crate::socks::{SocksAddress, SocksPort};
+use super::{SocksAddress, SocksPort};
 use super::traits::*;
+
 struct AuthReply {}
 
 /*
