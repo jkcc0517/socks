@@ -9,7 +9,7 @@ pub struct MethodRequest {
     methods: Vec<u8>,
 }
 
-impl SocksDeserializeable for MethodRequest {
+impl SocksPacket for MethodRequest {
     fn deserialize_from_bytes(bytes: &[u8]) -> MethodRequest {
         let n_methods = bytes[1];
         let end: usize = n_methods as usize + 2;
@@ -18,6 +18,10 @@ impl SocksDeserializeable for MethodRequest {
             n_methods: n_methods,
             methods: bytes[2..end].to_vec(),
         }
+    }
+    
+    fn serialize_to_bytes(&self) -> Vec<u8> {
+        todo!()
     }
 }
 
@@ -54,9 +58,13 @@ impl MethodReply {
     }
 }
 
-impl SocksSerializable for MethodReply {
+impl SocksPacket for MethodReply {
     fn serialize_to_bytes(&self) -> Vec<u8> {
         debug!("{:?}", self);
         vec![self.ver, self.method]
+    }
+    
+    fn deserialize_from_bytes(bytes: &[u8]) -> Self {
+        todo!()
     }
 }

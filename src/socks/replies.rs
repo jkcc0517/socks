@@ -30,13 +30,10 @@ pub struct SocksReply {
     bnd_port: SocksPort,
 }
 
-impl SocksDeserializeable for SocksReply {
+impl SocksPacket for SocksReply {
     fn deserialize_from_bytes(bytes: &[u8]) -> Self {
         todo!()
     }
-}
-
-impl SocksSerializable for SocksReply {
     fn serialize_to_bytes(&self) -> Vec<u8> {
         let mut s = vec![self.ver, self.rep, self.rsv, self.atyp];
         s.extend(self.bnd_addr.serialize_to_bytes());

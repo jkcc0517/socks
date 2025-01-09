@@ -56,7 +56,7 @@ impl UdpMessage {
     }
 }
 
-impl SocksDeserializeable for UdpMessage {
+impl SocksPacket for UdpMessage {
     fn deserialize_from_bytes(bytes: &[u8]) -> Self {
         let mut data = bytes.to_vec();
         let _rsv: Vec<u8> = data.drain(0..2).collect(); // 保留位元組，不處理
@@ -74,9 +74,6 @@ impl SocksDeserializeable for UdpMessage {
             data: udp_data.to_vec(),
         }
     }
-}
-
-impl SocksSerializable for UdpMessage {
     fn serialize_to_bytes(&self) -> Vec<u8> {
         let mut data: Vec<u8> = vec![
             0, 0, // 保留 16 bits

@@ -59,9 +59,13 @@ impl SocksPort {
     }
 
 }
-impl SocksSerializable for SocksPort {
+impl SocksPacket for SocksPort {
     fn serialize_to_bytes(&self) -> Vec<u8> {
         self.0.to_be_bytes().to_vec()
+    }
+    
+    fn deserialize_from_bytes(bytes: &[u8]) -> Self {
+        todo!()
     }
 }
 impl From<SocksPort> for u16 {
