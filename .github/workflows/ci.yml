@@ -30,9 +30,9 @@ jobs:
           cargo build --release
           mkdir -p dist
           if [[ "${{ matrix.platform }}" == "ubuntu-latest" ]]; then
-            mv target/release/socksproxy dist/socksproxy-x64
+            mv target/release/socks dist/socksproxy-x64
           else
-            mv target/release/socksproxy dist/socksproxy-macos
+            mv target/release/socks dist/socksproxy-macos
           fi
       - run: cargo test --verbose
       - name: Upload artifact
