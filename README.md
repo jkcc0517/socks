@@ -1,3 +1,8 @@
+# ⚠ Resource Management Warning
+This project has known limitations in resource management and error handling.
+Specifically, connection errors and timeouts are not properly handled, which may lead to unexpected behavior or resource exhaustion.
+It is not recommended for use in production environments. Please use with caution and monitor execution closely.
+
 # SOCKS5 Proxy Server
 
 A lightweight and fast SOCKS5 proxy server implementation in Rust.
