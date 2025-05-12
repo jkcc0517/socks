@@ -2,21 +2,52 @@ use log::{debug, info, error};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use std::net::SocketAddr;
+use clap::Parser;
 mod consts;
 mod socks;
 
 use socks::handlers::{SocksHandler, MethodHandler};
 use anyhow::Result;
 
+/// A SOCKS5 proxy server
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    /// Host address to bind
+    #[arg(long, default_value = "127.0.0.1")]
+    host: String,
+
+    /// Port number to listen on
+    #[arg(long, default_value_t = 1080)]
+    port: u16,
+
+    /// Enable verbose mode
+    #[arg(short, long)]
+    verbose: bool,
+}
+
 #[tokio::main(flavor = "multi_thread", worker_threads = 100)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    env_logger::init();
+    let args = Args::parse();
 
-    let listener = TcpListener::bind("0.0.0.0:1080").await?;
+    // 設置日誌級別
+    let env = env_logger::Env::default()
+        .filter_or("RUST_LOG", if args.verbose { "debug" } else { "info" });
+    env_logger::Builder::from_env(env).init();
+
+    let addr = format!("{}:{}", args.host, args.port);
+    info!("Starting SOCKS5 server on {}", addr);
+
+    let listener = TcpListener::bind(&addr).await?;
+    info!("SOCKS5 server listening on {}", addr);
+
     loop {
-        let (socket, _) = listener.accept().await?;
+        let (socket, addr) = listener.accept().await?;
+        info!("New connection from {}", addr);
         tokio::spawn(async move {
-            process_socks_connection(socket).await.unwrap();
+            if let Err(e) = process_socks_connection(socket).await {
+                error!("Connection error: {}", e);
+            }
         });
     }
 }
